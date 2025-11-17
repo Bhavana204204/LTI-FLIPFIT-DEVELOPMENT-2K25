@@ -9,10 +9,10 @@ public interface GymCustomerService {
 	
 	public List<Booking> viewBookings();
 	
-	public Booking cancelBooking();
+	public Booking cancelBooking(Long bookingId);
 	
-	public Booking getBookingDetails();
+	public Booking getBookingDetails(Long bookingId);
 	
-	public GymSlot bookSlot();
+	public Booking bookSlot(Booking booking);
 
 }

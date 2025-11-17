@@ -7,6 +7,14 @@ public class Booking {
 	private Long scheduledId;
 	private String status;
 	
+	
+	public Booking(Long bookingId, Long userId, Long scheduledId, String status) {
+		super();
+		this.bookingId = bookingId;
+		this.userId = userId;
+		this.scheduledId = scheduledId;
+		this.status = status;
+	}
 	public Long getBookingId() {
 		return bookingId;
 	}
