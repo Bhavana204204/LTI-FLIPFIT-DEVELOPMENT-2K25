@@ -1,0 +1,6 @@
+spring:
+  application:
+    name: LTI-FlipFit-SpringMicroservices-API
+
+server:
+  port: 8080
