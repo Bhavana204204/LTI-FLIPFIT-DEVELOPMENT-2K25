@@ -8,6 +8,7 @@ public class BookingServiceImpl implements BookingService {
 	@Override
 	public BookingService createBooking() {
 		// TODO Auto-generated method stub
+		String test ="Test";
 		return null;
 	}
 
