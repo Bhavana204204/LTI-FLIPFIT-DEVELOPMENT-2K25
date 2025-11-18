@@ -9,9 +9,9 @@ import com.lti.flipfit.beans.GymUser;
 public class WaitListServiceImpl implements WaitListService {
 
 	@Override
-	public GymUser promoteUser(GymUser gymUser) {
-		// TODO Auto-generated method stub
-		return null;
-	}
+    public GymUser promoteUser(GymUser gymUser) {
+        System.out.println("Promoting user: " + gymUser.getUserName());
+        return gymUser;
+    }
 
 }

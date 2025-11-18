@@ -6,6 +6,8 @@ public class GymUser {
 	private String userPassword;
 	private String email;
 	private String phone;
+	private String status;
+	
 	
 	public String getUserName() {
 		return userName;
@@ -31,5 +33,12 @@ public class GymUser {
 	public void setPhone(String phone) {
 		this.phone = phone;
 	}
+	public String getStatus() {
+		return status;
+	}
+	public void setStatus(String status) {
+		this.status = status;
+	}
+	
 	
 }
