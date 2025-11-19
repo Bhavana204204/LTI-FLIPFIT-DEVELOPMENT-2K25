@@ -13,6 +13,5 @@ public class AvailabilityResponse {
     private int capacity;
     private int booked;
     private int remaining;
-    private int waitlistCount;
 }
 

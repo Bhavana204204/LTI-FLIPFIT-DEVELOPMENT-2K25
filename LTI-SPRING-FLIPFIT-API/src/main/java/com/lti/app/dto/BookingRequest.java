@@ -7,5 +7,5 @@ import lombok.Data;
 public class BookingRequest {
     private Long userId;
     private Long centerId;
-    private Long slotInstanceId;
+    private Long slotId;
 }

@@ -3,11 +3,10 @@ package com.lti.app.services;
 
 import com.lti.app.dto.*;
 import com.lti.app.entity.*;
+import com.lti.app.exception.BookingNotFoundException;
 import com.lti.app.exception.SlotNotFoundException;
 import com.lti.app.repository.BookingRepository;
 import com.lti.app.repository.SlotRepository;
-import com.lti.app.repository.WaitlistRepository;
-import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,14 +22,13 @@ import java.util.Optional;
 public class BookingServiceImpl implements BookingService {
 
     private final BookingRepository bookingRepo;
-    private final WaitlistRepository waitlistRepo;
     private final SlotRepository slotRepo;
 
     @Override
     @Transactional
     public BookingResponse bookSlot(BookingRequest request) {
         // 1. load slot with DB row-lock to avoid race conditions
-        Slot slot = slotRepo.findByIdForUpdate(request.getSlotInstanceId())
+        Slot slot = slotRepo.findByIdForUpdate(request.getSlotId())
                 .orElseThrow(() -> new SlotNotFoundException("Slot not found"));
 
         // 2. remove conflicting booking of same date/time for user (requirement #3)
@@ -58,13 +56,7 @@ public class BookingServiceImpl implements BookingService {
             return BookingResponse.success("Booking confirmed", booking.getId());
         }
         // 4. slot full -> add to waitlist (FIFO)
-        Waitlist entry = Waitlist.builder()
-                .userId(request.getUserId())
-                .slotId(slot.getId())
-                .status(WaitlistStatus.WAITING)
-                .build();
 
-        waitlistRepo.save(entry);
         return BookingResponse.waitlisted("Slot full. Added to waitlist");
     }
 
@@ -72,7 +64,7 @@ public class BookingServiceImpl implements BookingService {
     @Transactional
     public CancelBookingResponse cancelBooking(Long bookingId, Long userId) {
         Booking booking = bookingRepo.findById(bookingId)
-                .orElseThrow(() -> new EntityNotFoundException("Booking not found"));
+                .orElseThrow(() -> new BookingNotFoundException("Booking not found"));
 
         if (!booking.getUserId().equals(userId)) {
             return CancelBookingResponse.failure("Unauthorized");
@@ -88,7 +80,7 @@ public class BookingServiceImpl implements BookingService {
 
         // unlock a seat: lock slot row
         Slot slot = slotRepo.findByIdForUpdate(booking.getSlotId())
-                .orElseThrow(() -> new EntityNotFoundException("SlotInstance not found"));
+                .orElseThrow(() -> new SlotNotFoundException("Slot not found"));
 
         slot.setSeatsRemaining(slot.getSeatsRemaining() + 1);
         // Optionally change status from FULL -> OPEN
@@ -97,8 +89,8 @@ public class BookingServiceImpl implements BookingService {
         }
         slotRepo.save(slot);
 
-        // promote earliest waitlisted user (if any)
-        promoteNextFromWaitlist(slot.getId());
+        // promote waitlisted user (if any)
+
 
         return CancelBookingResponse.success("Booking cancelled");
     }
@@ -107,16 +99,15 @@ public class BookingServiceImpl implements BookingService {
     @Transactional(readOnly = true)
     public AvailabilityResponse getAvailability(Long centerId, LocalDate date, LocalTime startTime) {
         Slot slot = slotRepo.findByCenterIdAndDateAndStartTime(centerId, date, startTime)
-                .orElseThrow(() -> new EntityNotFoundException("Slot not found"));
+                .orElseThrow(() -> new SlotNotFoundException("Slot not found"));
 
-        long waitlistCount = waitlistRepo.countBySlotId(slot.getId());
+
         int booked = slot.getCapacity() - slot.getSeatsRemaining();
 
         return AvailabilityResponse.builder()
                 .capacity(slot.getCapacity())
                 .booked(booked)
                 .remaining(slot.getSeatsRemaining())
-                .waitlistCount((int) waitlistCount)
                 .build();
     }
 
@@ -137,48 +128,13 @@ public class BookingServiceImpl implements BookingService {
 
             // free seat on the conflicting slot
             Slot conflictingSlot = slotRepo.findByIdForUpdate(b.getSlotId())
-                    .orElseThrow(() -> new EntityNotFoundException("SlotInstance not found"));
+                    .orElseThrow(() -> new SlotNotFoundException("Slot not found"));
             conflictingSlot.setSeatsRemaining(conflictingSlot.getSeatsRemaining() + 1);
             slotRepo.save(conflictingSlot);
 
             // promote waitlist for that slot
-            promoteNextFromWaitlist(conflictingSlot.getId());
+
         });
     }
 
-    // Promote first waiting user for a slot (kept transactional)
-    private void promoteNextFromWaitlist(Long slotInstanceId) {
-        List<Waitlist> waiting = waitlistRepo.findBySlotIdOrderByQueuedAt(slotInstanceId);
-        if (waiting.isEmpty()) return;
-
-        Waitlist next = waiting.get(0);
-
-        // lock slot again before confirming
-        Slot slot = slotRepo.findByIdForUpdate(slotInstanceId)
-                .orElseThrow(() -> new EntityNotFoundException("SlotInstance not found"));
-
-        if (slot.getSeatsRemaining() <= 0) {
-            // nothing to promote (concurrent race). just return.
-            return;
-        }
-
-        // consume a seat and create booking
-        slot.setSeatsRemaining(slot.getSeatsRemaining() - 1);
-        slotRepo.save(slot);
-
-        Booking newBooking = Booking.builder()
-                .userId(next.getUserId())
-                .slotId(slot.getId())
-                .centerId(slot.getCenterId())
-                .status(BookingStatus.CONFIRMED)
-                .build();
-
-        bookingRepo.save(newBooking);
-
-        // mark waitlist entry promoted
-        next.setStatus(WaitlistStatus.PROMOTED);
-        waitlistRepo.save(next);
-
-        // (optionally) publish event/notification here
-    }
 }

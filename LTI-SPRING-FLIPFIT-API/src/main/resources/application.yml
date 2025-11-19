@@ -1,6 +1,7 @@
 spring:
   application:
     name: LTI-FlipFit-SpringMicroservices-API
+
   datasource:
     url: jdbc:h2:mem:flipfitdb
     driver-class-name: org.h2.Driver
@@ -12,6 +13,11 @@ spring:
       ddl-auto: update
     show-sql: true
     database-platform: org.hibernate.dialect.H2Dialect
+    defer-datasource-initialization: true   # <-- IMPORTANT
+
+  sql:
+    init:
+      mode: always    # <-- IMPORTANT
 
   h2:
     console:
